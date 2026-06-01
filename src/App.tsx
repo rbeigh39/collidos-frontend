@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PublicOnlyRoute } from "@/components/PublicOnlyRoute";
 import { AuthProvider } from "@/contexts/AuthProvider";
-import { DashboardPage } from "@/pages/DashboardPage";
+import { MultiDayView } from "@/pages/MultiDayView";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 
@@ -19,7 +19,7 @@ export default function App() {
 
           {/* Authenticated app */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<MultiDayView />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

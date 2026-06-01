@@ -1,0 +1,121 @@
+import { FormEvent, memo, useState } from "react";
+import { BreadcrumbItem } from "@/components/BreadcrumbItem";
+import { TaskItem } from "@/components/TaskItem";
+import { relativeLabel, shortDate } from "@/lib/dates";
+import type { DayBucket, Task } from "@/types";
+
+interface DaySectionProps {
+  day: DayBucket;
+  todayStr: string;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onAddTask: (date: string, title: string) => void;
+  onToggleTask: (task: Task) => void;
+  onDeleteTask: (id: string) => void;
+  onGoToDate: (date: string) => void;
+}
+
+/**
+ * A single day rendered as a vertical column (Sunsama-style). Columns sit side
+ * by side in a horizontally scrolling row; each scrolls its own task list.
+ */
+export const DaySection = memo(function DaySection({
+  day,
+  todayStr,
+  selectedId,
+  onSelect,
+  onAddTask,
+  onToggleTask,
+  onDeleteTask,
+  onGoToDate,
+}: DaySectionProps) {
+  const [title, setTitle] = useState("");
+  const isToday = day.date === todayStr;
+  const openCount = day.live.filter((a) => a.task.status !== "done").length;
+
+  function handleAdd(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    onAddTask(day.date, trimmed);
+    setTitle("");
+  }
+
+  return (
+    // content-visibility keeps off-screen columns cheap to render.
+    <section
+      id={`day-${day.date}`}
+      className={`flex h-full w-80 shrink-0 flex-col border-r border-line ${
+        isToday ? "bg-surface" : "bg-canvas"
+      }`}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "320px 640px" }}
+    >
+      <header
+        className={`flex items-baseline gap-2 border-b border-line px-4 py-3 ${
+          isToday ? "bg-primary-soft" : ""
+        }`}
+      >
+        <h2 className={`text-sm font-semibold ${isToday ? "text-primary" : "text-ink"}`}>
+          {relativeLabel(day.date, todayStr)}
+        </h2>
+        <span className="text-xs text-ink-subtle">{shortDate(day.date)}</span>
+        {openCount > 0 ? (
+          <span className="ml-auto text-xs text-ink-subtle">{openCount}</span>
+        ) : null}
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-3 py-3">
+        <ul className="flex flex-col gap-2">
+          {day.live.map((a) => (
+            <TaskItem
+              key={a.task.id}
+              task={a.task}
+              selected={a.task.id === selectedId}
+              onToggle={onToggleTask}
+              onDelete={onDeleteTask}
+              onSelect={onSelect}
+            />
+          ))}
+        </ul>
+
+        {day.completed.length > 0 ? (
+          <ul className="mt-2 flex flex-col gap-2 opacity-70">
+            {day.completed.map((a) => (
+              <TaskItem
+                key={`done-${a.task.id}`}
+                task={a.task}
+                selected={a.task.id === selectedId}
+                onToggle={onToggleTask}
+                onDelete={onDeleteTask}
+                onSelect={onSelect}
+              />
+            ))}
+          </ul>
+        ) : null}
+
+        {day.breadcrumbs.length > 0 ? (
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {day.breadcrumbs.map((a) => (
+              <BreadcrumbItem
+                key={`bc-${a.task.id}`}
+                appearance={a}
+                todayStr={todayStr}
+                onSelect={onSelect}
+                onGoToLiveDate={onGoToDate}
+              />
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      <form onSubmit={handleAdd} className="border-t border-line p-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="+ Add a task"
+          className="w-full rounded-control border border-transparent bg-transparent px-3 py-1.5 text-sm text-ink placeholder:text-ink-subtle hover:border-line focus:border-primary focus:bg-surface"
+        />
+      </form>
+    </section>
+  );
+});
