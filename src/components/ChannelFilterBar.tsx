@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 import { ChannelChip } from "@/components/ChannelChip";
 import type { Channel } from "@/types";
 
@@ -11,6 +11,8 @@ interface ChannelFilterBarProps {
   onToggle: (id: string) => void;
   onClear: () => void;
   onCreate: (input: { name: string; color: string }) => Promise<unknown>;
+  /** Right-aligned actions (e.g. the Backlog toggle). */
+  rightSlot?: ReactNode;
 }
 
 export function ChannelFilterBar({
@@ -19,6 +21,7 @@ export function ChannelFilterBar({
   onToggle,
   onClear,
   onCreate,
+  rightSlot,
 }: ChannelFilterBarProps) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -95,6 +98,8 @@ export function ChannelFilterBar({
           + Channel
         </button>
       )}
+
+      {rightSlot ? <div className="ml-auto">{rightSlot}</div> : null}
     </div>
   );
 }

@@ -32,6 +32,19 @@ export interface Objective {
 
 export type TaskStatus = "backlog" | "planned" | "in_progress" | "done";
 
+export type BacklogBucket =
+  | "next_two_weeks"
+  | "next_month"
+  | "next_quarter"
+  | "next_year"
+  | "someday"
+  | "never";
+
+export interface BacklogGroup {
+  bucket: BacklogBucket;
+  tasks: Task[];
+}
+
 export interface Subtask {
   id: string;
   title: string;
@@ -52,6 +65,8 @@ export interface Task {
   channel?: string;
   channelRef?: string;
   objective?: string;
+  backlogBucket?: BacklogBucket;
+  backlogFolder?: string;
   completedAt?: string;
   order: number;
   rolloverCount: number;

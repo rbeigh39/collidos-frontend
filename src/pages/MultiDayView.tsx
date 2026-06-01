@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSWRConfig } from "swr";
 import { AppShell } from "@/components/AppShell";
+import { BacklogRail } from "@/components/BacklogRail";
 import { ChannelFilterBar } from "@/components/ChannelFilterBar";
 import { DaySection } from "@/components/DaySection";
 import { ObjectivesStrip } from "@/components/ObjectivesStrip";
@@ -12,7 +14,9 @@ import type { Task } from "@/types";
 
 export function MultiDayView() {
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
+  const [backlogOpen, setBacklogOpen] = useState(false);
   const { channels, addChannel } = useChannels();
+  const { mutate: globalMutate } = useSWRConfig();
   const range = useTaskRange(channelFilter);
   const {
     days,
@@ -42,6 +46,15 @@ export function MultiDayView() {
         cur.includes(id) ? cur.filter((c) => c !== id) : [...cur, id],
       ),
     [],
+  );
+
+  // Move a scheduled task back to the backlog (refreshes range + backlog list).
+  const sendToBacklog = useCallback(
+    async (id: string) => {
+      await editTask(id, { plannedDate: null });
+      await globalMutate("backlog");
+    },
+    [editTask, globalMutate],
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -124,6 +137,18 @@ export function MultiDayView() {
           onToggle={toggleChannel}
           onClear={() => setChannelFilter([])}
           onCreate={addChannel}
+          rightSlot={
+            <button
+              onClick={() => setBacklogOpen((v) => !v)}
+              className={`rounded-control px-2.5 py-1 text-xs transition-colors ${
+                backlogOpen
+                  ? "bg-primary-soft text-primary"
+                  : "text-ink-muted hover:bg-primary-soft/60"
+              }`}
+            >
+              ≣ Backlog
+            </button>
+          }
         />
         <ObjectivesStrip weekAnchor={today} channels={channels} />
 
@@ -158,12 +183,17 @@ export function MultiDayView() {
               channels={channels}
               objectives={objectives}
               onClose={() => setSelectedId(null)}
+              onSendToBacklog={sendToBacklog}
               editTask={editTask}
               addSubtask={addSubtask}
               toggleSubtask={toggleSubtask}
               renameSubtask={renameSubtask}
               removeSubtask={removeSubtask}
             />
+          ) : null}
+
+          {backlogOpen ? (
+            <BacklogRail today={today} onClose={() => setBacklogOpen(false)} />
           ) : null}
         </div>
       </div>

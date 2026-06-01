@@ -24,6 +24,7 @@ interface TaskDetailPanelProps extends TaskDetailHandlers {
   channels: Channel[];
   objectives: Objective[];
   onClose: () => void;
+  onSendToBacklog?: (id: string) => void;
 }
 
 export function TaskDetailPanel({
@@ -31,6 +32,7 @@ export function TaskDetailPanel({
   channels,
   objectives,
   onClose,
+  onSendToBacklog,
   editTask,
   addSubtask,
   toggleSubtask,
@@ -77,9 +79,19 @@ export function TaskDetailPanel({
         <span className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
           Task details
         </span>
-        <button onClick={onClose} aria-label="Close details" className="text-ink-subtle hover:text-ink">
-          ✕
-        </button>
+        <div className="flex items-center gap-3">
+          {onSendToBacklog && task.plannedDate ? (
+            <button
+              onClick={() => onSendToBacklog(task.id)}
+              className="text-xs text-ink-muted hover:text-primary"
+            >
+              Move to backlog
+            </button>
+          ) : null}
+          <button onClick={onClose} aria-label="Close details" className="text-ink-subtle hover:text-ink">
+            ✕
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">

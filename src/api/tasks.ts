@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/apiClient";
-import type { ApiSuccess, Task, TaskStatus } from "@/types";
+import type { ApiSuccess, BacklogBucket, Task, TaskStatus } from "@/types";
 
 export interface TaskListParams {
   status?: TaskStatus;
@@ -15,6 +15,10 @@ export interface TaskInput {
   plannedDate?: string | null;
   timeEstimateMinutes?: number;
   channel?: string;
+  channelRef?: string | null;
+  objective?: string | null;
+  backlogBucket?: BacklogBucket;
+  backlogFolder?: string | null;
   order?: number;
 }
 
