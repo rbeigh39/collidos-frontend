@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans;
+  }
+
+  /* Calm, consistent focus ring across interactive elements. */
+  :where(button, a, input, textarea, select):focus-visible {
+    @apply outline-none ring-2 ring-primary/40 ring-offset-2 ring-offset-canvas;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-control px-4 py-2
+      text-sm font-medium transition-colors disabled:cursor-not-allowed
+      disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-hover;
+  }
+  .btn-ghost {
+    @apply btn text-ink-muted hover:bg-primary-soft hover:text-primary;
+  }
+
+  .input {
+    @apply w-full rounded-control border border-line bg-surface px-3 py-2 text-sm
+      text-ink placeholder:text-ink-subtle transition-colors
+      focus:border-primary;
+  }
+
+  .card {
+    @apply rounded-card border border-line bg-surface shadow-card;
+  }
+}
