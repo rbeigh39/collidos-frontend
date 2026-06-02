@@ -84,7 +84,7 @@ export function useTaskRange(channelIds: string[] = []) {
   const moveAndReorder = useCallback(
     async (id: string, date: string, orderedIds: string[]) => {
       await updateTask(id, { plannedDate: date });
-      await reorderTasksApi(date, orderedIds);
+      await reorderTasksApi(orderedIds);
       await refresh();
     },
     [refresh],
@@ -155,8 +155,8 @@ export function useTaskRange(channelIds: string[] = []) {
   );
 
   const reorderTasks = useCallback(
-    async (day: string | null, orderedIds: string[]) => {
-      await reorderTasksApi(day, orderedIds);
+    async (orderedIds: string[]) => {
+      await reorderTasksApi(orderedIds);
       await refresh();
     },
     [refresh],

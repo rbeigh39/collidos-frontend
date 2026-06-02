@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { SubtaskRow } from "@/components/SubtaskRow";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
+import { useElapsedMinutes } from "@/hooks/useElapsedMinutes";
 import type { Channel, Objective, Task } from "@/types";
 
 export interface TaskEditInput {
@@ -59,26 +60,13 @@ export function TaskDetailPanel({
     void editTask(id, { notes: value });
   }, 600);
 
+  // Hooks must run unconditionally — keep this above the early return.
+  const elapsed = useElapsedMinutes(task?.timerStartedAt);
+
   if (!task) return null;
 
   const isRunning = !!task.timerStartedAt;
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    if (task?.timerStartedAt) {
-      const start = new Date(task.timerStartedAt).getTime();
-      const update = () => {
-        setElapsed(Math.round((Date.now() - start) / 60000));
-      };
-      update();
-      const interval = setInterval(update, 60000);
-      return () => clearInterval(interval);
-    } else {
-      setElapsed(0);
-    }
-  }, [task?.timerStartedAt]);
-
-  const actualTime = (task?.actualTimeMinutes || 0) + elapsed;
+  const actualTime = (task.actualTimeMinutes || 0) + elapsed;
 
   const done = task.subtasks.filter((s) => s.completed).length;
 

@@ -1,10 +1,14 @@
-import { memo, useEffect, useState } from "react";
-import type { Task } from "@/types";
+import { CSSProperties, memo } from "react";
+import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useElapsedMinutes } from "@/hooks/useElapsedMinutes";
+import type { Task } from "@/types";
 
 interface TaskItemProps {
   task: Task;
+  /** Calendar day (YYYY-MM-DD) this card is rendered under; used for DnD. */
+  dayDate?: string;
   selected?: boolean;
   onToggle: (task: Task) => void;
   onDelete: (id: string) => void;
@@ -14,9 +18,9 @@ interface TaskItemProps {
 
 interface TaskCardProps extends TaskItemProps {
   isOverlay?: boolean;
-  style?: React.CSSProperties;
-  attributes?: any;
-  listeners?: any;
+  style?: CSSProperties;
+  attributes?: DraggableAttributes;
+  listeners?: DraggableSyntheticListeners;
   setNodeRef?: (node: HTMLElement | null) => void;
 }
 
@@ -39,20 +43,7 @@ export const TaskCard = memo(function TaskCard({
   const doneSubtasks = task.subtasks.filter((s) => s.completed).length;
 
   const isRunning = !!task.timerStartedAt;
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    if (task?.timerStartedAt) {
-      const start = new Date(task.timerStartedAt).getTime();
-      const update = () => setElapsed(Math.round((Date.now() - start) / 60000));
-      update();
-      const interval = setInterval(update, 60000);
-      return () => clearInterval(interval);
-    } else {
-      setElapsed(0);
-    }
-  }, [task?.timerStartedAt]);
-
+  const elapsed = useElapsedMinutes(task.timerStartedAt);
   const actualTime = (task.actualTimeMinutes || 0) + elapsed;
 
   return (
@@ -120,7 +111,10 @@ export const TaskItem = memo(function TaskItem(props: TaskItemProps) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: props.task.id, data: { type: "Task", task: props.task } });
+  } = useSortable({
+    id: props.task.id,
+    data: { type: "Task", task: props.task, date: props.dayDate },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),

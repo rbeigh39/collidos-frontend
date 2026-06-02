@@ -79,6 +79,7 @@ export const DaySection = memo(function DaySection({
               <TaskItem
                 key={a.task.id}
                 task={a.task}
+                dayDate={day.date}
                 selected={a.task.id === selectedId}
                 onToggle={onToggleTask}
                 onDelete={onDeleteTask}

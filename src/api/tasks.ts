@@ -63,8 +63,8 @@ export async function stopTimer(id: string): Promise<Task> {
   return data.data.task;
 }
 
-export async function reorderTasks(day: string | null, orderedIds: string[]): Promise<void> {
-  await apiClient.patch(`/tasks/reorder`, { day, orderedIds });
+export async function reorderTasks(orderedIds: string[]): Promise<void> {
+  await apiClient.patch(`/tasks/reorder`, { orderedIds });
 }
 
 // ─── Subtasks (all return the updated parent task) ──────────────────────────

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSWRConfig } from "swr";
 import {
+  closestCenter,
   DndContext,
   DragEndEvent,
   DragStartEvent,
   DragOverlay,
   PointerSensor,
-  pointerWithin,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -189,52 +189,48 @@ export function MultiDayView() {
       return;
     }
     const draggedTask = active.data.current?.task as Task | undefined;
-    const overDate = over.data.current?.date || over.data.current?.task?.plannedDate;
+    // Both day columns and task cards expose a calendar `date` (YYYY-MM-DD) in
+    // their dnd data, so source/target comparisons stay in one consistent format.
+    const sourceDate = active.data.current?.date as string | undefined;
+    const overDate = over.data.current?.date as string | undefined;
 
     if (!draggedTask || !overDate) {
       setActiveTask(null);
       return;
     }
 
-    if (draggedTask.plannedDate !== overDate) {
-      settleRef.current = { taskId: draggedTask.id, sourceDate: draggedTask.plannedDate ?? "" };
+    const dayBucket = days.find((d) => d.date === overDate);
+
+    if (sourceDate !== overDate) {
+      // Cross-day move.
+      settleRef.current = { taskId: draggedTask.id, sourceDate: sourceDate ?? "" };
       setSettleTaskId(draggedTask.id);
-      const isOverTask = over.data.current?.type === "Task";
-      if (isOverTask) {
-        const dayBucket = days.find((d) => d.date === overDate);
-        if (dayBucket) {
-          const targetIndex = dayBucket.live.findIndex((a) => a.task.id === over.id);
-          const ids = dayBucket.live.map((a) => a.task.id);
-          const newIds = ids.filter((id) => id !== draggedTask.id);
-          const insertAt = targetIndex >= 0
-            ? targetIndex > newIds.length ? newIds.length : targetIndex
-            : newIds.length;
-          newIds.splice(insertAt, 0, draggedTask.id);
-          void range.moveAndReorder(draggedTask.id, overDate, newIds);
-        } else {
-          void range.moveTask(draggedTask.id, overDate);
-        }
+      if (over.data.current?.type === "Task" && dayBucket) {
+        // Insert at the dropped position within the target day.
+        const newIds = dayBucket.live.map((a) => a.task.id).filter((id) => id !== draggedTask.id);
+        const targetIndex = dayBucket.live.findIndex((a) => a.task.id === over.id);
+        const insertAt = targetIndex >= 0 ? Math.min(targetIndex, newIds.length) : newIds.length;
+        newIds.splice(insertAt, 0, draggedTask.id);
+        void range.moveAndReorder(draggedTask.id, overDate, newIds);
       } else {
-        const dayBucket = days.find((d) => d.date === overDate);
+        // Dropped on the column itself: append to the end.
         const lastOrder = dayBucket?.live.length
           ? Math.max(...dayBucket.live.map((a) => a.task.order ?? 0))
           : -1;
         void range.moveTask(draggedTask.id, overDate, lastOrder + 1);
       }
     } else {
+      // Same-day reorder.
       setActiveTask(null);
-      if (active.id !== over.id) {
-        const dayBucket = days.find((d) => d.date === overDate);
-        if (dayBucket) {
-          const ids = dayBucket.live.map((a) => a.task.id);
-          const oldIndex = ids.indexOf(active.id as string);
-          const newIndex = ids.indexOf(over.id as string);
-          if (oldIndex !== -1 && newIndex !== -1) {
-            const newIds = [...ids];
-            newIds.splice(oldIndex, 1);
-            newIds.splice(newIndex, 0, active.id as string);
-            void range.reorderTasks(overDate, newIds);
-          }
+      if (active.id !== over.id && dayBucket) {
+        const ids = dayBucket.live.map((a) => a.task.id);
+        const oldIndex = ids.indexOf(active.id as string);
+        const newIndex = ids.indexOf(over.id as string);
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newIds = [...ids];
+          newIds.splice(oldIndex, 1);
+          newIds.splice(newIndex, 0, active.id as string);
+          void range.reorderTasks(newIds);
         }
       }
     }
@@ -243,7 +239,7 @@ export function MultiDayView() {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => {
