@@ -15,6 +15,7 @@ export function useObjectives(weekStart: string) {
   const { data, error, isLoading, mutate } = useSWR<Objective[]>(
     ["objectives", weekStart],
     () => listObjectives(weekStart),
+    { revalidateOnFocus: false },
   );
 
   const add = useCallback(

@@ -10,7 +10,9 @@ import {
 import type { Channel } from "@/types";
 
 export function useChannels() {
-  const { data, error, isLoading, mutate } = useSWR<Channel[]>("channels", listChannels);
+  const { data, error, isLoading, mutate } = useSWR<Channel[]>("channels", listChannels, {
+    revalidateOnFocus: false,
+  });
 
   const add = useCallback(
     async (input: ChannelInput) => {
