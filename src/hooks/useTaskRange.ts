@@ -8,6 +8,9 @@ import {
   reorderSubtasks as reorderSubtasksApi,
   updateSubtask as updateSubtaskApi,
   updateTask,
+  startTimer as startTimerApi,
+  stopTimer as stopTimerApi,
+  reorderTasks as reorderTasksApi,
   type TaskInput,
 } from "@/api/tasks";
 import { fetchRange } from "@/api/range";
@@ -71,8 +74,17 @@ export function useTaskRange(channelIds: string[] = []) {
   );
 
   const moveTask = useCallback(
-    async (id: string, date: string | null) => {
+    async (id: string, date: string | null, order?: number) => {
+      await updateTask(id, { plannedDate: date, order });
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const moveAndReorder = useCallback(
+    async (id: string, date: string, orderedIds: string[]) => {
       await updateTask(id, { plannedDate: date });
+      await reorderTasksApi(date, orderedIds);
       await refresh();
     },
     [refresh],
@@ -126,6 +138,30 @@ export function useTaskRange(channelIds: string[] = []) {
     [refresh],
   );
 
+  const startTimer = useCallback(
+    async (taskId: string) => {
+      await startTimerApi(taskId);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const stopTimer = useCallback(
+    async (taskId: string) => {
+      await stopTimerApi(taskId);
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const reorderTasks = useCallback(
+    async (day: string | null, orderedIds: string[]) => {
+      await reorderTasksApi(day, orderedIds);
+      await refresh();
+    },
+    [refresh],
+  );
+
   return {
     days: data?.days ?? [],
     timezone: data?.timezone ?? tz,
@@ -139,11 +175,15 @@ export function useTaskRange(channelIds: string[] = []) {
     toggleTaskDone,
     editTask,
     moveTask,
+    moveAndReorder,
     removeTask,
     addSubtask,
     toggleSubtask,
     renameSubtask,
     removeSubtask,
     reorderSubtasks,
+    startTimer,
+    stopTimer,
+    reorderTasks,
   };
 }

@@ -3,6 +3,8 @@ import { BreadcrumbItem } from "@/components/BreadcrumbItem";
 import { TaskItem } from "@/components/TaskItem";
 import { relativeLabel, shortDate } from "@/lib/dates";
 import type { DayBucket, Task } from "@/types";
+import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
 interface DaySectionProps {
   day: DayBucket;
@@ -13,6 +15,7 @@ interface DaySectionProps {
   onToggleTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
   onGoToDate: (date: string) => void;
+  settleTaskId?: string | null;
 }
 
 /**
@@ -28,6 +31,7 @@ export const DaySection = memo(function DaySection({
   onToggleTask,
   onDeleteTask,
   onGoToDate,
+  settleTaskId,
 }: DaySectionProps) {
   const [title, setTitle] = useState("");
   const isToday = day.date === todayStr;
@@ -41,14 +45,18 @@ export const DaySection = memo(function DaySection({
     setTitle("");
   }
 
+  const { setNodeRef } = useDroppable({
+    id: `day-${day.date}`,
+    data: { type: "Day", date: day.date },
+  });
+
   return (
-    // content-visibility keeps off-screen columns cheap to render.
     <section
+      ref={setNodeRef}
       id={`day-${day.date}`}
       className={`flex h-full w-80 shrink-0 flex-col border-r border-line ${
         isToday ? "bg-surface" : "bg-canvas"
       }`}
-      style={{ contentVisibility: "auto", containIntrinsicSize: "320px 640px" }}
     >
       <header
         className={`flex items-baseline gap-2 border-b border-line px-4 py-3 ${
@@ -65,18 +73,21 @@ export const DaySection = memo(function DaySection({
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 py-3">
-        <ul className="flex flex-col gap-2">
-          {day.live.map((a) => (
-            <TaskItem
-              key={a.task.id}
-              task={a.task}
-              selected={a.task.id === selectedId}
-              onToggle={onToggleTask}
-              onDelete={onDeleteTask}
-              onSelect={onSelect}
-            />
-          ))}
-        </ul>
+        <SortableContext items={day.live.map((a) => a.task.id)} strategy={verticalListSortingStrategy}>
+          <ul className="flex flex-col gap-2 min-h-2">
+            {day.live.map((a) => (
+              <TaskItem
+                key={a.task.id}
+                task={a.task}
+                selected={a.task.id === selectedId}
+                onToggle={onToggleTask}
+                onDelete={onDeleteTask}
+                onSelect={onSelect}
+                settleTaskId={settleTaskId}
+              />
+            ))}
+          </ul>
+        </SortableContext>
 
         {day.completed.length > 0 ? (
           <ul className="mt-2 flex flex-col gap-2 opacity-70">

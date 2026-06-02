@@ -62,6 +62,8 @@ export interface Task {
   subtasks: Subtask[];
   plannedDate?: string;
   timeEstimateMinutes?: number;
+  actualTimeMinutes?: number;
+  timerStartedAt?: string;
   channel?: string;
   channelRef?: string;
   objective?: string;

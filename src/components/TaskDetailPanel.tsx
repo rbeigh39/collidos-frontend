@@ -17,6 +17,8 @@ export interface TaskDetailHandlers {
   toggleSubtask: (taskId: string, subId: string, completed: boolean) => Promise<unknown>;
   renameSubtask: (taskId: string, subId: string, title: string) => Promise<unknown>;
   removeSubtask: (taskId: string, subId: string) => Promise<unknown>;
+  startTimer?: (taskId: string) => Promise<unknown>;
+  stopTimer?: (taskId: string) => Promise<unknown>;
 }
 
 interface TaskDetailPanelProps extends TaskDetailHandlers {
@@ -38,6 +40,8 @@ export function TaskDetailPanel({
   toggleSubtask,
   renameSubtask,
   removeSubtask,
+  startTimer,
+  stopTimer,
 }: TaskDetailPanelProps) {
   // Local mirrors so typing is responsive; saves are debounced to the server.
   const [title, setTitle] = useState("");
@@ -56,6 +60,25 @@ export function TaskDetailPanel({
   }, 600);
 
   if (!task) return null;
+
+  const isRunning = !!task.timerStartedAt;
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (task?.timerStartedAt) {
+      const start = new Date(task.timerStartedAt).getTime();
+      const update = () => {
+        setElapsed(Math.round((Date.now() - start) / 60000));
+      };
+      update();
+      const interval = setInterval(update, 60000);
+      return () => clearInterval(interval);
+    } else {
+      setElapsed(0);
+    }
+  }, [task?.timerStartedAt]);
+
+  const actualTime = (task?.actualTimeMinutes || 0) + elapsed;
 
   const done = task.subtasks.filter((s) => s.completed).length;
 
@@ -142,6 +165,41 @@ export function TaskDetailPanel({
                 </option>
               ))}
             </select>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-ink-muted">Estimate (min)</label>
+            <input
+              type="number"
+              min="0"
+              value={task.timeEstimateMinutes ?? ""}
+              onChange={(e) => {
+                const val = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                void editTask(task.id, { timeEstimateMinutes: val });
+              }}
+              className="input py-1.5 text-sm"
+              placeholder="0"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-ink-muted">Actual (min)</label>
+            <div className="flex items-center gap-2 h-[34px]">
+              <span className="text-sm font-medium text-ink w-8">{actualTime}m</span>
+              {startTimer && stopTimer && (
+                <button
+                  onClick={() => isRunning ? stopTimer(task.id) : startTimer(task.id)}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${
+                    isRunning 
+                      ? "bg-warning/20 text-warning hover:bg-warning/30 animate-pulse" 
+                      : "bg-primary/10 text-primary hover:bg-primary/20"
+                  }`}
+                >
+                  {isRunning ? "Stop" : "Start"}
+                </button>
+              )}
+            </div>
           </div>
         </section>
 

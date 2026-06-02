@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSWRConfig } from "swr";
+import {
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { AppShell } from "@/components/AppShell";
 import { BacklogRail } from "@/components/BacklogRail";
 import { ChannelFilterBar } from "@/components/ChannelFilterBar";
 import { DaySection } from "@/components/DaySection";
+import { TaskCard } from "@/components/TaskItem";
 import { ObjectivesStrip } from "@/components/ObjectivesStrip";
 import { TaskDetailPanel } from "@/components/TaskDetailPanel";
 import { useChannels } from "@/hooks/useChannels";
@@ -33,12 +44,14 @@ export function MultiDayView() {
     toggleSubtask,
     renameSubtask,
     removeSubtask,
+    startTimer,
+    stopTimer,
   } = range;
 
-  // Focused-week objectives (for the strip and the detail-panel picker).
   const { objectives } = useObjectives(today);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const toggleChannel = useCallback(
     (id: string) =>
@@ -128,8 +141,118 @@ export function MultiDayView() {
     [removeTask],
   );
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const [settleTaskId, setSettleTaskId] = useState<string | null>(null);
+  const settleRef = useRef<{ taskId: string; sourceDate: string } | null>(null);
+
+  useEffect(() => {
+    const settle = settleRef.current;
+    if (!settle) return;
+    const { taskId, sourceDate } = settle;
+
+    for (const day of days) {
+      const found = day.live.some((a) => a.task.id === taskId);
+      if (found && day.date !== sourceDate) {
+        settleRef.current = null;
+        setSettleTaskId(null);
+        setActiveTask(null);
+        return;
+      }
+    }
+  }, [days]);
+
+  useEffect(() => {
+    if (!settleTaskId) return;
+    const timer = setTimeout(() => {
+      settleRef.current = null;
+      setSettleTaskId(null);
+      setActiveTask(null);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [settleTaskId]);
+
+  function handleDragStart(event: DragStartEvent) {
+    const { active } = event;
+    const task = active.data.current?.task as Task | undefined;
+    if (task) {
+      setActiveTask(task);
+    }
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) {
+      setActiveTask(null);
+      return;
+    }
+    const draggedTask = active.data.current?.task as Task | undefined;
+    const overDate = over.data.current?.date || over.data.current?.task?.plannedDate;
+
+    if (!draggedTask || !overDate) {
+      setActiveTask(null);
+      return;
+    }
+
+    if (draggedTask.plannedDate !== overDate) {
+      settleRef.current = { taskId: draggedTask.id, sourceDate: draggedTask.plannedDate ?? "" };
+      setSettleTaskId(draggedTask.id);
+      const isOverTask = over.data.current?.type === "Task";
+      if (isOverTask) {
+        const dayBucket = days.find((d) => d.date === overDate);
+        if (dayBucket) {
+          const targetIndex = dayBucket.live.findIndex((a) => a.task.id === over.id);
+          const ids = dayBucket.live.map((a) => a.task.id);
+          const newIds = ids.filter((id) => id !== draggedTask.id);
+          const insertAt = targetIndex >= 0
+            ? targetIndex > newIds.length ? newIds.length : targetIndex
+            : newIds.length;
+          newIds.splice(insertAt, 0, draggedTask.id);
+          void range.moveAndReorder(draggedTask.id, overDate, newIds);
+        } else {
+          void range.moveTask(draggedTask.id, overDate);
+        }
+      } else {
+        const dayBucket = days.find((d) => d.date === overDate);
+        const lastOrder = dayBucket?.live.length
+          ? Math.max(...dayBucket.live.map((a) => a.task.order ?? 0))
+          : -1;
+        void range.moveTask(draggedTask.id, overDate, lastOrder + 1);
+      }
+    } else {
+      setActiveTask(null);
+      if (active.id !== over.id) {
+        const dayBucket = days.find((d) => d.date === overDate);
+        if (dayBucket) {
+          const ids = dayBucket.live.map((a) => a.task.id);
+          const oldIndex = ids.indexOf(active.id as string);
+          const newIndex = ids.indexOf(over.id as string);
+          if (oldIndex !== -1 && newIndex !== -1) {
+            const newIds = [...ids];
+            newIds.splice(oldIndex, 1);
+            newIds.splice(newIndex, 0, active.id as string);
+            void range.reorderTasks(overDate, newIds);
+          }
+        }
+      }
+    }
+  }
+
   return (
-    <AppShell>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => {
+        settleRef.current = null;
+        setActiveTask(null);
+        setSettleTaskId(null);
+      }}
+    >
+      <AppShell>
       <div className="flex h-full flex-col">
         <ChannelFilterBar
           channels={channels}
@@ -171,6 +294,7 @@ export function MultiDayView() {
                   onToggleTask={toggleTaskDone}
                   onDeleteTask={handleDelete}
                   onGoToDate={goToDate}
+                  settleTaskId={settleTaskId}
                 />
               ))}
               <div ref={rightSentinel} className="w-px shrink-0" />
@@ -189,6 +313,8 @@ export function MultiDayView() {
               toggleSubtask={toggleSubtask}
               renameSubtask={renameSubtask}
               removeSubtask={removeSubtask}
+              startTimer={startTimer}
+              stopTimer={stopTimer}
             />
           ) : null}
 
@@ -197,7 +323,19 @@ export function MultiDayView() {
           ) : null}
         </div>
       </div>
-    </AppShell>
+      </AppShell>
+      <DragOverlay dropAnimation={null}>
+        {activeTask || settleTaskId ? (
+          <TaskCard
+            task={activeTask || (findTask(days, settleTaskId)!)}
+            onToggle={() => {}}
+            onDelete={() => {}}
+            onSelect={() => {}}
+            isOverlay
+          />
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 

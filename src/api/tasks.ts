@@ -49,6 +49,24 @@ export async function deleteTask(id: string): Promise<void> {
   await apiClient.delete(`/tasks/${id}`);
 }
 
+export async function startTimer(id: string): Promise<Task> {
+  const { data } = await apiClient.post<ApiSuccess<{ task: Task }>>(
+    `/tasks/${id}/timer/start`,
+  );
+  return data.data.task;
+}
+
+export async function stopTimer(id: string): Promise<Task> {
+  const { data } = await apiClient.post<ApiSuccess<{ task: Task }>>(
+    `/tasks/${id}/timer/stop`,
+  );
+  return data.data.task;
+}
+
+export async function reorderTasks(day: string | null, orderedIds: string[]): Promise<void> {
+  await apiClient.patch(`/tasks/reorder`, { day, orderedIds });
+}
+
 // ─── Subtasks (all return the updated parent task) ──────────────────────────
 
 export async function addSubtask(taskId: string, title: string): Promise<Task> {
