@@ -1,18 +1,23 @@
-import { CSSProperties, memo } from "react";
+import { CSSProperties, memo, useMemo } from "react";
 import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useElapsedMinutes } from "@/hooks/useElapsedMinutes";
-import type { Task } from "@/types";
+import type { Channel, Task } from "@/types";
 
 interface TaskItemProps {
   task: Task;
   /** Calendar day (YYYY-MM-DD) this card is rendered under; used for DnD. */
   dayDate?: string;
   selected?: boolean;
+  /** Resolved channel for this task (from channelRef), if any. */
+  channel?: Channel | null;
+  /** Subtask ids that were completed on the day this card is rendered under. */
+  completedSubtaskIdsOnThisDay?: string[];
   onToggle: (task: Task) => void;
   onDelete: (id: string) => void;
   onSelect: (id: string) => void;
+  onToggleSubtask?: (taskId: string, subId: string, completed: boolean) => void;
   settleTaskId?: string | null;
 }
 
@@ -27,9 +32,12 @@ interface TaskCardProps extends TaskItemProps {
 export const TaskCard = memo(function TaskCard({
   task,
   selected = false,
+  channel,
+  completedSubtaskIdsOnThisDay,
   onToggle,
   onDelete,
   onSelect,
+  onToggleSubtask,
   isOverlay = false,
   style,
   attributes,
@@ -46,6 +54,16 @@ export const TaskCard = memo(function TaskCard({
   const elapsed = useElapsedMinutes(task.timerStartedAt);
   const actualTime = (task.actualTimeMinutes || 0) + elapsed;
 
+  // Per the app's defining mechanic, a day shows a task's *open* subtasks (they
+  // roll forward) plus subtasks completed *on this day*. Subtasks completed on
+  // other days surface there as breadcrumbs, so we don't repeat them here.
+  const visibleSubtasks = useMemo(() => {
+    const completedHere = new Set(completedSubtaskIdsOnThisDay ?? []);
+    return [...task.subtasks]
+      .filter((s) => !s.completed || completedHere.has(s.id))
+      .sort((a, b) => a.order - b.order);
+  }, [task.subtasks, completedSubtaskIdsOnThisDay]);
+
   return (
     <li
       ref={setNodeRef}
@@ -53,51 +71,85 @@ export const TaskCard = memo(function TaskCard({
       {...attributes}
       {...listeners}
       onClick={() => onSelect(task.id)}
-      className={`group flex cursor-pointer items-center gap-3 rounded-control border bg-surface px-3 py-2.5 shadow-card transition-colors hover:border-primary/30 ${
+      className={`group flex cursor-pointer flex-col gap-2 rounded-control border bg-surface px-3 py-2.5 shadow-card transition-colors hover:border-primary/30 ${
         selected ? "border-primary" : "border-line"
       } ${isOverlay ? "cursor-grabbing shadow-lg ring-2 ring-primary ring-opacity-50" : ""}`}
     >
-      <input
-        type="checkbox"
-        checked={isDone}
-        onChange={() => onToggle(task)}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        aria-label={isDone ? "Mark task incomplete" : "Mark task complete"}
-        className="h-4 w-4 cursor-pointer accent-primary"
-      />
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={isDone}
+          onChange={() => onToggle(task)}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={isDone ? "Mark task incomplete" : "Mark task complete"}
+          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+        />
 
-      <div className="min-w-0 flex-1">
-        <p className={`truncate text-sm ${isDone ? "text-ink-subtle line-through" : "text-ink"}`}>
-          {task.title}
-        </p>
-        <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-subtle">
-          {task.channel ? <span>{task.channel}</span> : null}
-          {task.timeEstimateMinutes || actualTime > 0 || isRunning ? (
-            <span className={`flex items-center gap-1 ${isRunning ? "text-warning font-medium animate-pulse" : ""}`}>
-              · {task.timeEstimateMinutes || 0}m
-              {(actualTime > 0 || isRunning) ? ` / ${actualTime}m` : ""}
-            </span>
-          ) : null}
-          {totalSubtasks > 0 ? (
-            <span>
-              ☑ {doneSubtasks}/{totalSubtasks}
-            </span>
-          ) : null}
+        <div className="min-w-0 flex-1">
+          <p className={`line-clamp-3 text-sm ${isDone ? "text-ink-subtle line-through" : "text-ink"}`}>
+            {task.title}
+          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-subtle">
+            {task.timeEstimateMinutes || actualTime > 0 || isRunning ? (
+              <span className={`flex items-center gap-1 ${isRunning ? "text-warning font-medium animate-pulse" : ""}`}>
+                {task.timeEstimateMinutes || 0}m
+                {actualTime > 0 || isRunning ? ` / ${actualTime}m` : ""}
+              </span>
+            ) : null}
+            {totalSubtasks > 0 ? (
+              <span>
+                ☑ {doneSubtasks}/{totalSubtasks}
+              </span>
+            ) : null}
+          </div>
         </div>
+
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(task.id);
+          }}
+          aria-label="Delete task"
+          className="shrink-0 text-ink-subtle opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+        >
+          ✕
+        </button>
       </div>
 
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete(task.id);
-        }}
-        aria-label="Delete task"
-        className="text-ink-subtle opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
-      >
-        ✕
-      </button>
+      {visibleSubtasks.length > 0 ? (
+        <ul className="flex flex-col gap-0.5 pl-7">
+          {visibleSubtasks.map((s) => (
+            <li key={s.id} className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={s.completed}
+                onChange={() => onToggleSubtask?.(task.id, s.id, !s.completed)}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={s.completed ? "Mark subtask incomplete" : "Mark subtask complete"}
+                className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-primary"
+              />
+              <span className={`truncate ${s.completed ? "text-ink-subtle line-through" : "text-ink-muted"}`}>
+                {s.title}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {channel || task.channel ? (
+        <div className="flex justify-end">
+          {channel ? (
+            <span className="text-xs font-medium" style={{ color: channel.color }}>
+              #{channel.name}
+            </span>
+          ) : (
+            <span className="text-xs text-ink-subtle">#{task.channel}</span>
+          )}
+        </div>
+      ) : null}
     </li>
   );
 });

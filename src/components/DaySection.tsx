@@ -2,7 +2,7 @@ import { FormEvent, memo, useState } from "react";
 import { BreadcrumbItem } from "@/components/BreadcrumbItem";
 import { TaskItem } from "@/components/TaskItem";
 import { relativeLabel, shortDate } from "@/lib/dates";
-import type { DayBucket, Task } from "@/types";
+import type { Channel, DayBucket, Task } from "@/types";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
@@ -10,9 +10,12 @@ interface DaySectionProps {
   day: DayBucket;
   todayStr: string;
   selectedId: string | null;
+  /** channelRef id → Channel, for rendering the #channel chip on cards. */
+  channelById: Map<string, Channel>;
   onSelect: (id: string) => void;
   onAddTask: (date: string, title: string) => void;
   onToggleTask: (task: Task) => void;
+  onToggleSubtask: (taskId: string, subId: string, completed: boolean) => void;
   onDeleteTask: (id: string) => void;
   onGoToDate: (date: string) => void;
   settleTaskId?: string | null;
@@ -26,9 +29,11 @@ export const DaySection = memo(function DaySection({
   day,
   todayStr,
   selectedId,
+  channelById,
   onSelect,
   onAddTask,
   onToggleTask,
+  onToggleSubtask,
   onDeleteTask,
   onGoToDate,
   settleTaskId,
@@ -81,7 +86,10 @@ export const DaySection = memo(function DaySection({
                 task={a.task}
                 dayDate={day.date}
                 selected={a.task.id === selectedId}
+                channel={a.task.channelRef ? channelById.get(a.task.channelRef) ?? null : null}
+                completedSubtaskIdsOnThisDay={a.completedSubtaskIdsOnThisDay}
                 onToggle={onToggleTask}
+                onToggleSubtask={onToggleSubtask}
                 onDelete={onDeleteTask}
                 onSelect={onSelect}
                 settleTaskId={settleTaskId}
@@ -97,7 +105,10 @@ export const DaySection = memo(function DaySection({
                 key={`done-${a.task.id}`}
                 task={a.task}
                 selected={a.task.id === selectedId}
+                channel={a.task.channelRef ? channelById.get(a.task.channelRef) ?? null : null}
+                completedSubtaskIdsOnThisDay={a.completedSubtaskIdsOnThisDay}
                 onToggle={onToggleTask}
+                onToggleSubtask={onToggleSubtask}
                 onDelete={onDeleteTask}
                 onSelect={onSelect}
               />

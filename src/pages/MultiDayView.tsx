@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSWRConfig } from "swr";
 import {
   closestCenter,
@@ -27,6 +27,10 @@ export function MultiDayView() {
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [backlogOpen, setBacklogOpen] = useState(false);
   const { channels, addChannel } = useChannels();
+  const channelById = useMemo(
+    () => new Map(channels.map((c) => [c.id, c])),
+    [channels],
+  );
   const { mutate: globalMutate } = useSWRConfig();
   const range = useTaskRange(channelFilter);
   const {
@@ -285,9 +289,11 @@ export function MultiDayView() {
                   day={day}
                   todayStr={today}
                   selectedId={selectedId}
+                  channelById={channelById}
                   onSelect={setSelectedId}
                   onAddTask={addTask}
                   onToggleTask={toggleTaskDone}
+                  onToggleSubtask={toggleSubtask}
                   onDeleteTask={handleDelete}
                   onGoToDate={goToDate}
                   settleTaskId={settleTaskId}
@@ -322,13 +328,19 @@ export function MultiDayView() {
       </AppShell>
       <DragOverlay dropAnimation={null}>
         {activeTask || settleTaskId ? (
-          <TaskCard
-            task={activeTask || (findTask(days, settleTaskId)!)}
-            onToggle={() => {}}
-            onDelete={() => {}}
-            onSelect={() => {}}
-            isOverlay
-          />
+          (() => {
+            const overlayTask = activeTask || findTask(days, settleTaskId)!;
+            return (
+              <TaskCard
+                task={overlayTask}
+                channel={overlayTask.channelRef ? channelById.get(overlayTask.channelRef) ?? null : null}
+                onToggle={() => {}}
+                onDelete={() => {}}
+                onSelect={() => {}}
+                isOverlay
+              />
+            );
+          })()
         ) : null}
       </DragOverlay>
     </DndContext>
