@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useSWRConfig } from "swr";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   closestCenter,
   DndContext,
@@ -21,6 +21,7 @@ import { useChannels } from "@/hooks/useChannels";
 import { useObjectives } from "@/hooks/useObjectives";
 import { useTaskRange } from "@/hooks/useTaskRange";
 import { getErrorMessage } from "@/lib/getErrorMessage";
+import { qk } from "@/lib/queryKeys";
 import type { Task } from "@/types";
 
 export function MultiDayView() {
@@ -31,7 +32,7 @@ export function MultiDayView() {
     () => new Map(channels.map((c) => [c.id, c])),
     [channels],
   );
-  const { mutate: globalMutate } = useSWRConfig();
+  const queryClient = useQueryClient();
   const range = useTaskRange(channelFilter);
   const {
     days,
@@ -66,12 +67,14 @@ export function MultiDayView() {
   );
 
   // Move a scheduled task back to the backlog (refreshes range + backlog list).
+  // editTask already invalidates the range root on settle; the task also leaves
+  // the day window, so refresh the backlog list it now belongs to.
   const sendToBacklog = useCallback(
     async (id: string) => {
       await editTask(id, { plannedDate: null });
-      await globalMutate("backlog");
+      await queryClient.invalidateQueries({ queryKey: qk.backlog });
     },
-    [editTask, globalMutate],
+    [editTask, queryClient],
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);

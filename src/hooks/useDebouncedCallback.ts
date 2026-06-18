@@ -10,7 +10,7 @@ export function useDebouncedCallback<Args extends unknown[]>(
   delayMs: number,
 ) {
   const callbackRef = useRef(callback);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Keep the ref pointing at the freshest callback without re-creating debounce.
   useEffect(() => {
