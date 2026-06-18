@@ -27,7 +27,7 @@ import type { Task } from "@/types";
 export function MultiDayView() {
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
   const [backlogOpen, setBacklogOpen] = useState(false);
-  const { channels, addChannel } = useChannels();
+  const { channels, addChannel, editChannel, removeChannel } = useChannels();
   const channelById = useMemo(
     () => new Map(channels.map((c) => [c.id, c])),
     [channels],
@@ -263,6 +263,8 @@ export function MultiDayView() {
           onToggle={toggleChannel}
           onClear={() => setChannelFilter([])}
           onCreate={addChannel}
+          onEdit={(id, input) => editChannel(id, input)}
+          onDelete={(id) => removeChannel(id)}
           rightSlot={
             <button
               onClick={() => setBacklogOpen((v) => !v)}

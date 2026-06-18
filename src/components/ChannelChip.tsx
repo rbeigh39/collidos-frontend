@@ -4,12 +4,14 @@ interface ChannelChipProps {
   channel: Channel;
   active?: boolean;
   onClick?: () => void;
+  /** When provided, a pencil affordance reveals on hover to edit the channel. */
+  onEdit?: () => void;
 }
 
 /** A small colored channel pill, optionally toggleable (for filtering). */
-export function ChannelChip({ channel, active, onClick }: ChannelChipProps) {
+export function ChannelChip({ channel, active, onClick, onEdit }: ChannelChipProps) {
   const interactive = typeof onClick === "function";
-  return (
+  const chip = (
     <button
       type="button"
       onClick={onClick}
@@ -26,5 +28,24 @@ export function ChannelChip({ channel, active, onClick }: ChannelChipProps) {
       />
       {channel.name}
     </button>
+  );
+
+  if (!onEdit) return chip;
+
+  return (
+    <span className="group relative inline-flex items-center">
+      {chip}
+      <button
+        type="button"
+        aria-label={`Edit channel ${channel.name}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit();
+        }}
+        className="ml-1 text-ink-subtle opacity-0 transition-opacity hover:text-primary group-hover:opacity-100 focus-visible:opacity-100"
+      >
+        ✎
+      </button>
+    </span>
   );
 }
