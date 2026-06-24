@@ -1,7 +1,7 @@
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
-import { SettingsModal } from "@/components/SettingsModal";
 
 const NAV_ITEMS = [
   { label: "Today", icon: "◷", active: true },
@@ -12,7 +12,8 @@ const NAV_ITEMS = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const navigate = useNavigate();
+  const onSettings = useLocation().pathname === "/settings";
 
   return (
     <div className="flex h-screen bg-canvas text-ink">
@@ -48,8 +49,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <p className="px-3 text-xs text-ink-subtle">{user?.email}</p>
           <Button
             variant="ghost"
-            className="mt-2 w-full justify-start"
-            onClick={() => setSettingsOpen(true)}
+            className={`mt-2 w-full justify-start ${onSettings ? "bg-primary-soft font-medium text-primary" : ""}`}
+            onClick={() => navigate("/settings")}
           >
             ⚙ Settings
           </Button>
@@ -61,8 +62,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">{children}</main>
-
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

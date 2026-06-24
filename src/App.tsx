@@ -8,6 +8,7 @@ import { queryClient } from "@/lib/queryClient";
 import { MultiDayView } from "@/pages/MultiDayView";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
             {/* Authenticated app */}
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<MultiDayView />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
