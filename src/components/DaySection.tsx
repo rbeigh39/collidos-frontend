@@ -77,6 +77,15 @@ export const DaySection = memo(function DaySection({
         ) : null}
       </header>
 
+      <form onSubmit={handleAdd} className="border-b border-line p-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="+ Add a task"
+          className="w-full rounded-control border border-transparent bg-transparent px-3 py-1.5 text-sm text-ink placeholder:text-ink-subtle hover:border-line focus:border-primary focus:bg-surface"
+        />
+      </form>
+
       <div className="flex-1 overflow-y-auto px-3 py-3">
         <SortableContext items={day.live.map((a) => a.task.id)} strategy={verticalListSortingStrategy}>
           <ul className="flex flex-col gap-2 min-h-2">
@@ -130,15 +139,6 @@ export const DaySection = memo(function DaySection({
           </ul>
         ) : null}
       </div>
-
-      <form onSubmit={handleAdd} className="border-t border-line p-2">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="+ Add a task"
-          className="w-full rounded-control border border-transparent bg-transparent px-3 py-1.5 text-sm text-ink placeholder:text-ink-subtle hover:border-line focus:border-primary focus:bg-surface"
-        />
-      </form>
     </section>
   );
 });
