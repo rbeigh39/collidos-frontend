@@ -3,7 +3,7 @@ import type { User, UserSettings } from "@/types";
 
 export interface AuthContextValue {
   user: User | null;
-  /** True while the initial session bootstrap (silent refresh) is in flight. */
+  /** True while the initial session bootstrap (profile fetch) is in flight. */
   isBootstrapping: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;

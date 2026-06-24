@@ -1,13 +1,14 @@
 import { apiClient } from "@/lib/apiClient";
 import type { ApiSuccess, User, UserSettings } from "@/types";
 
-interface AuthPayload {
-  user: User;
-  accessToken: string;
-}
+/**
+ * Profile API. Identity (sign in/up/out, session) is handled by the better-auth
+ * client (see lib/authClient.ts); this module covers the app "profile" — the
+ * authenticated user's record and settings, served at /api/profile.
+ */
 
 /** Best-effort browser timezone, used to seed settings on register. */
-function browserTimezone(): string | undefined {
+export function browserTimezone(): string | undefined {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch {
@@ -15,49 +16,18 @@ function browserTimezone(): string | undefined {
   }
 }
 
-export async function register(input: {
-  name: string;
-  email: string;
-  password: string;
-}): Promise<AuthPayload> {
-  const { data } = await apiClient.post<ApiSuccess<AuthPayload>>("/auth/register", {
-    ...input,
-    timezone: browserTimezone(),
-  });
-  return data.data;
+/** The current user + settings. 401 if there is no valid session. */
+export async function fetchMe(): Promise<User> {
+  const { data } = await apiClient.get<ApiSuccess<{ user: User }>>("/profile");
+  return data.data.user;
 }
 
 export async function updateSettings(
   settings: Partial<UserSettings>,
 ): Promise<User> {
   const { data } = await apiClient.patch<ApiSuccess<{ user: User }>>(
-    "/auth/settings",
+    "/profile/settings",
     settings,
   );
-  return data.data.user;
-}
-
-export async function login(input: {
-  email: string;
-  password: string;
-}): Promise<AuthPayload> {
-  const { data } = await apiClient.post<ApiSuccess<AuthPayload>>(
-    "/auth/login",
-    input,
-  );
-  return data.data;
-}
-
-export async function refresh(): Promise<AuthPayload> {
-  const { data } = await apiClient.post<ApiSuccess<AuthPayload>>("/auth/refresh");
-  return data.data;
-}
-
-export async function logout(): Promise<void> {
-  await apiClient.post("/auth/logout");
-}
-
-export async function fetchMe(): Promise<User> {
-  const { data } = await apiClient.get<ApiSuccess<{ user: User }>>("/auth/me");
   return data.data.user;
 }

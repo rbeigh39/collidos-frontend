@@ -1,96 +1,39 @@
-import axios, {
-  AxiosError,
-  AxiosInstance,
-  InternalAxiosRequestConfig,
-} from "axios";
+import axios, { AxiosError, AxiosInstance } from "axios";
 
 /**
  * Single Axios instance for the whole app.
  *
- * Auth model:
- *  - The access token lives in memory only (never localStorage) and is attached
- *    as a Bearer header on every request.
- *  - The refresh token is an httpOnly cookie the browser sends automatically to
- *    /api/auth; JS can't read it, which mitigates XSS token theft.
- *  - On a 401 we transparently call /auth/refresh once, then retry the request.
+ * Auth model (better-auth):
+ *  - Authentication is a server-side session backed by an httpOnly cookie that
+ *    the browser sends automatically. There is no access token in JS.
+ *  - `withCredentials` ensures the session cookie rides along. For the cookie to
+ *    be first-party (and therefore reliable across browsers), the API must be
+ *    served same-origin with the SPA — in dev via the Vite proxy, in production
+ *    via a reverse proxy. See docs/features/auth-and-sessions.md.
+ *  - On a 401 we notify the auth layer so it can drop the user; we do not retry.
  */
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL,
-  withCredentials: true, // send the refresh cookie
+  withCredentials: true, // send the session cookie
 });
 
-// ─── In-memory access token ──────────────────────────────────────────────
-let accessToken: string | null = null;
-// Called by the auth layer when the token is refreshed outside of a request.
-let onTokenRefreshed: ((token: string | null) => void) | null = null;
+// ─── Unauthorized handling ─────────────────────────────────────────────────
+let onUnauthorized: (() => void) | null = null;
 
-export function setAccessToken(token: string | null): void {
-  accessToken = token;
-}
-
-export function getAccessToken(): string | null {
-  return accessToken;
-}
-
-export function onAuthTokenChange(cb: (token: string | null) => void): void {
-  onTokenRefreshed = cb;
-}
-
-// ─── Request: attach the bearer token ──────────────────────────────────────
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
-  }
-  return config;
-});
-
-// ─── Response: refresh-and-retry on 401 ────────────────────────────────────
-interface RetriableConfig extends InternalAxiosRequestConfig {
-  _retried?: boolean;
-}
-
-// Dedupe concurrent refreshes so a burst of 401s triggers a single refresh.
-let refreshPromise: Promise<string | null> | null = null;
-
-async function refreshAccessToken(): Promise<string | null> {
-  if (!refreshPromise) {
-    refreshPromise = apiClient
-      .post<{ data: { accessToken: string } }>("/auth/refresh")
-      .then((res) => res.data.data.accessToken)
-      .catch(() => null)
-      .finally(() => {
-        refreshPromise = null;
-      });
-  }
-  return refreshPromise;
+/** Registered by the auth layer; called when a request comes back 401. */
+export function setUnauthorizedHandler(cb: (() => void) | null): void {
+  onUnauthorized = cb;
 }
 
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    const original = error.config as RetriableConfig | undefined;
-    const status = error.response?.status;
-    const isRefreshCall = original?.url?.includes("/auth/refresh");
-
-    if (status === 401 && original && !original._retried && !isRefreshCall) {
-      original._retried = true;
-      const newToken = await refreshAccessToken();
-
-      if (newToken) {
-        setAccessToken(newToken);
-        onTokenRefreshed?.(newToken);
-        original.headers.Authorization = `Bearer ${newToken}`;
-        return apiClient(original);
-      }
-
-      // Refresh failed — the session is gone.
-      setAccessToken(null);
-      onTokenRefreshed?.(null);
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      onUnauthorized?.();
     }
-
     return Promise.reject(error);
   },
 );

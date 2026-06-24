@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import * as authApi from "@/api/auth";
-import { onAuthTokenChange, setAccessToken } from "@/lib/apiClient";
+import { setUnauthorizedHandler } from "@/lib/apiClient";
+import { authClient } from "@/lib/authClient";
 import type { User, UserSettings } from "@/types";
 import { AuthContext, type AuthContextValue } from "./auth-context";
 
@@ -8,19 +9,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
-  // On first load, try a silent refresh to restore an existing session.
+  // On first load, fetch the profile. A valid session cookie → the user is
+  // restored; otherwise the request 401s and we stay logged out.
   useEffect(() => {
     let cancelled = false;
 
     authApi
-      .refresh()
-      .then(({ user: refreshedUser, accessToken }) => {
-        if (cancelled) return;
-        setAccessToken(accessToken);
-        setUser(refreshedUser);
+      .fetchMe()
+      .then((me) => {
+        if (!cancelled) setUser(me);
       })
       .catch(() => {
-        // No valid session — that's expected for logged-out visitors.
+        // No valid session — expected for logged-out visitors.
       })
       .finally(() => {
         if (!cancelled) setIsBootstrapping(false);
@@ -31,37 +31,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // If the apiClient gives up refreshing mid-session, drop the user.
+  // If any request comes back 401 mid-session, drop the user.
   useEffect(() => {
-    onAuthTokenChange((token) => {
-      if (!token) setUser(null);
-    });
+    setUnauthorizedHandler(() => setUser(null));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { user: loggedIn, accessToken } = await authApi.login({ email, password });
-    setAccessToken(accessToken);
-    setUser(loggedIn);
+    const { error } = await authClient.signIn.email({ email, password });
+    if (error) throw new Error(error.message || "Unable to sign in");
+    setUser(await authApi.fetchMe());
   }, []);
 
   const register = useCallback(
     async (name: string, email: string, password: string) => {
-      const { user: created, accessToken } = await authApi.register({
+      const { error } = await authClient.signUp.email({
         name,
         email,
         password,
+        // Seed the timezone from the browser so rollover works out of the box.
+        timezone: authApi.browserTimezone(),
       });
-      setAccessToken(accessToken);
-      setUser(created);
+      if (error) throw new Error(error.message || "Unable to create account");
+      setUser(await authApi.fetchMe());
     },
     [],
   );
 
   const logout = useCallback(async () => {
     try {
-      await authApi.logout();
+      await authClient.signOut();
     } finally {
-      setAccessToken(null);
       setUser(null);
     }
   }, []);

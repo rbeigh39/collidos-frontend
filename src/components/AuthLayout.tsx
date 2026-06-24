@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { Logo } from "@/components/Logo";
 
 interface AuthLayoutProps {
   title: string;
@@ -13,8 +14,8 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-card bg-primary text-lg font-semibold text-white">
-            ☼
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-card bg-primary text-white">
+            <Logo className="h-7 w-7" />
           </div>
           <h1 className="text-xl font-semibold text-ink">{title}</h1>
           <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>
