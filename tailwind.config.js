@@ -14,9 +14,9 @@ export default {
         },
         line: "#ebe9e4", // hairline borders
         primary: {
-          DEFAULT: "#6c5ce7", // signature indigo/violet
-          hover: "#5a4bd4",
-          soft: "#efedfd", // tinted background for selected/hover
+          DEFAULT: "#0d9488", // teal-600
+          hover: "#0f766e", // teal-700
+          soft: "#f0fdfa", // teal-50 — tinted background for selected/hover
         },
         accent: "#ff7a59", // warm coral for highlights / focus moments
         success: "#3bbf86",
