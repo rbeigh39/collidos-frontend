@@ -41,9 +41,11 @@ export async function deleteObjective(id: string): Promise<void> {
   await apiClient.delete(`/objectives/${id}`);
 }
 
-export async function extendObjectiveWeek(id: string): Promise<Objective> {
+/** Shift an objective by whole weeks (negative = earlier). */
+export async function moveObjectiveWeek(id: string, weeks: number): Promise<Objective> {
   const { data } = await apiClient.post<ApiSuccess<{ objective: Objective }>>(
-    `/objectives/${id}/extend-week`,
+    `/objectives/${id}/move-week`,
+    { weeks },
   );
   return data.data.objective;
 }

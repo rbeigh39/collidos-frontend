@@ -2,6 +2,7 @@ export interface UserSettings {
   timezone: string;
   autoRollover: boolean;
   carryOpenSubtasks: boolean;
+  autoRolloverObjectives: boolean;
   weekStartsOn: number;
 }
 

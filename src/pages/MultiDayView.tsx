@@ -278,7 +278,7 @@ export function MultiDayView() {
             </button>
           }
         />
-        <ObjectivesStrip weekAnchor={today} channels={channels} />
+        <ObjectivesStrip today={today} channels={channels} />
 
         <div className="flex min-h-0 flex-1">
           {isLoading && days.length === 0 ? (
