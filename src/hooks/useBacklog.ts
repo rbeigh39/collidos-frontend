@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchBacklog } from "@/api/backlog";
 import { createTask, deleteTask, updateTask } from "@/api/tasks";
 import { qk } from "@/lib/queryKeys";
-import type { BacklogBucket, BacklogGroup } from "@/types";
+import { tempId } from "@/lib/ids";
+import type { BacklogBucket, BacklogGroup, Task } from "@/types";
 
 export function useBacklog() {
   const client = useQueryClient();
@@ -24,9 +25,47 @@ export function useBacklog() {
     void client.invalidateQueries({ queryKey: qk.rangeRoot });
   }, [client]);
 
+  // Snapshot + restore the backlog list around an optimistic change.
+  const snapshotBacklog = useCallback(async () => {
+    await client.cancelQueries({ queryKey: qk.backlog });
+    return client.getQueryData<BacklogGroup[]>(qk.backlog);
+  }, [client]);
+  const restoreBacklog = useCallback(
+    (previous: BacklogGroup[] | undefined) => {
+      if (previous) client.setQueryData(qk.backlog, previous);
+    },
+    [client],
+  );
+
   const addMutation = useMutation({
     mutationFn: ({ bucket, title }: { bucket: BacklogBucket; title: string }) =>
       createTask({ title, backlogBucket: bucket }),
+    onMutate: async ({ bucket, title }: { bucket: BacklogBucket; title: string }) => {
+      const previous = await snapshotBacklog();
+      const now = new Date().toISOString();
+      const optimistic: Task = {
+        id: tempId(),
+        title,
+        status: "backlog",
+        subtasks: [],
+        backlogBucket: bucket,
+        order: Number.MAX_SAFE_INTEGER,
+        rolloverCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      client.setQueryData<BacklogGroup[]>(qk.backlog, (old) => {
+        const groups = old ?? [];
+        if (groups.some((g) => g.bucket === bucket)) {
+          return groups.map((g) =>
+            g.bucket === bucket ? { ...g, tasks: [...g.tasks, optimistic] } : g,
+          );
+        }
+        return [...groups, { bucket, tasks: [optimistic] }];
+      });
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => restoreBacklog(ctx?.previous),
     onSettled: invalidateBacklog,
   });
   const scheduleMutation = useMutation({
@@ -41,6 +80,14 @@ export function useBacklog() {
   });
   const removeMutation = useMutation({
     mutationFn: (id: string) => deleteTask(id),
+    onMutate: async (id: string) => {
+      const previous = await snapshotBacklog();
+      client.setQueryData<BacklogGroup[]>(qk.backlog, (old) =>
+        (old ?? []).map((g) => ({ ...g, tasks: g.tasks.filter((t) => t.id !== id) })),
+      );
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => restoreBacklog(ctx?.previous),
     onSettled: invalidateBacklog,
   });
 

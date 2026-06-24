@@ -23,6 +23,7 @@ import { fetchRange } from "@/api/range";
 import { useAuth } from "@/hooks/useAuth";
 import { qk } from "@/lib/queryKeys";
 import { shiftDate, todayString } from "@/lib/dates";
+import { tempId } from "@/lib/ids";
 import type { RangeResponse, Task, TaskAppearance } from "@/types";
 
 const DAYS_BEFORE = 5;
@@ -52,6 +53,53 @@ function patchTask(
       live: mapBucket(day.live),
       completed: mapBucket(day.completed),
       breadcrumbs: mapBucket(day.breadcrumbs),
+    })),
+  };
+}
+
+/** Insert a freshly-created task into its day's `live` bucket (optimistic). */
+function insertTask(
+  data: RangeResponse,
+  date: string,
+  title: string,
+  id: string,
+): RangeResponse {
+  if (!data.days.some((d) => d.date === date)) return data; // day not in window
+  const now = new Date().toISOString();
+  const task: Task = {
+    id,
+    title,
+    status: "planned",
+    subtasks: [],
+    plannedDate: date,
+    order: Number.MAX_SAFE_INTEGER, // sort/append last until the settle refetch
+    rolloverCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const appearance: TaskAppearance = {
+    task,
+    completedSubtaskIdsOnThisDay: [],
+    leftBehindSubtaskIdsOnThisDay: [],
+    openSubtaskCount: 0,
+  };
+  return {
+    ...data,
+    days: data.days.map((day) =>
+      day.date === date ? { ...day, live: [...day.live, appearance] } : day,
+    ),
+  };
+}
+
+/** Remove a task from every day bucket it appears in (optimistic delete). */
+function removeTaskFromBuckets(data: RangeResponse, taskId: string): RangeResponse {
+  return {
+    ...data,
+    days: data.days.map((day) => ({
+      ...day,
+      live: day.live.filter((a) => a.task.id !== taskId),
+      completed: day.completed.filter((a) => a.task.id !== taskId),
+      breadcrumbs: day.breadcrumbs.filter((a) => a.task.id !== taskId),
     })),
   };
 }
@@ -196,10 +244,14 @@ export function useTaskRange(channelIds: string[] = []) {
   // the settle refetch. All invalidate `rangeRoot` on settle.
 
   const addMutation = useMutation(
-    makeRangeMutation(client, ({ date, title }: { date: string; title: string }) => {
-      const input: TaskInput = { title, status: "planned", plannedDate: date };
-      return createTask(input);
-    }),
+    makeRangeMutation(
+      client,
+      ({ date, title }: { date: string; title: string; tempId: string }) => {
+        const input: TaskInput = { title, status: "planned", plannedDate: date };
+        return createTask(input);
+      },
+      (data, { date, title, tempId: id }) => insertTask(data, date, title, id),
+    ),
   );
 
   const toggleDoneMutation = useMutation(
@@ -260,12 +312,26 @@ export function useTaskRange(channelIds: string[] = []) {
   );
 
   const removeMutation = useMutation(
-    makeRangeMutation(client, (id: string) => deleteTask(id)),
+    makeRangeMutation(
+      client,
+      (id: string) => deleteTask(id),
+      (data, id) => removeTaskFromBuckets(data, id),
+    ),
   );
 
   const addSubtaskMutation = useMutation(
-    makeRangeMutation(client, ({ taskId, title }: { taskId: string; title: string }) =>
-      addSubtaskApi(taskId, title),
+    makeRangeMutation(
+      client,
+      ({ taskId, title }: { taskId: string; title: string; tempId: string }) =>
+        addSubtaskApi(taskId, title),
+      (data, { taskId, title, tempId: id }) =>
+        patchTask(data, taskId, (t) => ({
+          ...t,
+          subtasks: [
+            ...t.subtasks,
+            { id, title, completed: false, order: t.subtasks.length },
+          ],
+        })),
     ),
   );
 
@@ -298,8 +364,15 @@ export function useTaskRange(channelIds: string[] = []) {
   );
 
   const removeSubtaskMutation = useMutation(
-    makeRangeMutation(client, ({ taskId, subId }: { taskId: string; subId: string }) =>
-      deleteSubtaskApi(taskId, subId),
+    makeRangeMutation(
+      client,
+      ({ taskId, subId }: { taskId: string; subId: string }) =>
+        deleteSubtaskApi(taskId, subId),
+      (data, { taskId, subId }) =>
+        patchTask(data, taskId, (t) => ({
+          ...t,
+          subtasks: t.subtasks.filter((s) => s.id !== subId),
+        })),
     ),
   );
 
@@ -321,7 +394,8 @@ export function useTaskRange(channelIds: string[] = []) {
 
   // ─── Stable callbacks preserving the prior hook's public API ───────────────
   const addTask = useCallback(
-    (date: string, title: string) => addMutation.mutateAsync({ date, title }),
+    (date: string, title: string) =>
+      addMutation.mutateAsync({ date, title, tempId: tempId() }),
     [addMutation],
   );
   const toggleTaskDone = useCallback(
@@ -351,7 +425,8 @@ export function useTaskRange(channelIds: string[] = []) {
     [removeMutation],
   );
   const addSubtask = useCallback(
-    (taskId: string, title: string) => addSubtaskMutation.mutateAsync({ taskId, title }),
+    (taskId: string, title: string) =>
+      addSubtaskMutation.mutateAsync({ taskId, title, tempId: tempId() }),
     [addSubtaskMutation],
   );
   const toggleSubtask = useCallback(

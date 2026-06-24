@@ -8,6 +8,7 @@ import {
   type ChannelInput,
 } from "@/api/channels";
 import { qk } from "@/lib/queryKeys";
+import { tempId } from "@/lib/ids";
 import type { Channel } from "@/types";
 
 export function useChannels() {
@@ -25,8 +26,34 @@ export function useChannels() {
     void client.invalidateQueries({ queryKey: qk.rangeRoot });
   }, [client]);
 
+  // Snapshot + restore the channels list around an optimistic change.
+  const snapshotChannels = useCallback(async () => {
+    await client.cancelQueries({ queryKey: qk.channels });
+    const previous = client.getQueryData<Channel[]>(qk.channels);
+    return previous;
+  }, [client]);
+  const restoreChannels = useCallback(
+    (previous: Channel[] | undefined) => {
+      if (previous) client.setQueryData(qk.channels, previous);
+    },
+    [client],
+  );
+
   const addMutation = useMutation({
     mutationFn: (input: ChannelInput) => createChannel(input),
+    onMutate: async (input: ChannelInput) => {
+      const previous = await snapshotChannels();
+      const optimistic: Channel = {
+        id: tempId(),
+        name: input.name,
+        color: input.color,
+        order: input.order ?? Number.MAX_SAFE_INTEGER,
+        archived: input.archived ?? false,
+      };
+      client.setQueryData<Channel[]>(qk.channels, (old) => [...(old ?? []), optimistic]);
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => restoreChannels(ctx?.previous),
     onSettled: invalidate,
   });
   const editMutation = useMutation({
@@ -36,6 +63,14 @@ export function useChannels() {
   });
   const removeMutation = useMutation({
     mutationFn: (id: string) => deleteChannel(id),
+    onMutate: async (id: string) => {
+      const previous = await snapshotChannels();
+      client.setQueryData<Channel[]>(qk.channels, (old) =>
+        (old ?? []).filter((c) => c.id !== id),
+      );
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => restoreChannels(ctx?.previous),
     onSettled: invalidate,
   });
 
