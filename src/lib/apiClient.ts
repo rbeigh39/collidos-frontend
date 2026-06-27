@@ -13,7 +13,13 @@ import axios, { AxiosError, AxiosInstance } from "axios";
  *  - On a 401 we notify the auth layer so it can drop the user; we do not retry.
  */
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
+// VITE_API_BASE_URL is the API *origin* (no path), matching authClient — which
+// lets better-auth append `/api/auth/*`. We append `/api` for the REST routes.
+// Unset (dev): fall back to the SPA origin so the Vite proxy handles `/api`.
+const apiOrigin = (
+  import.meta.env.VITE_API_BASE_URL || window.location.origin
+).replace(/\/$/, "");
+const baseURL = `${apiOrigin}/api`;
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL,
