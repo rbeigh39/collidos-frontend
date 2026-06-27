@@ -6,8 +6,10 @@ import { PublicOnlyRoute } from "@/components/PublicOnlyRoute";
 import { AuthProvider } from "@/contexts/AuthProvider";
 import { queryClient } from "@/lib/queryClient";
 import { MultiDayView } from "@/pages/MultiDayView";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 
 export default function App() {
@@ -21,6 +23,10 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
             </Route>
+
+            {/* Public, reachable even with a stale session (email links) */}
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* Authenticated app */}
             <Route element={<ProtectedRoute />}>

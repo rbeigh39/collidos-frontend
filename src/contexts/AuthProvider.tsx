@@ -39,7 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const { error } = await authClient.signIn.email({ email, password });
-    if (error) throw new Error(error.message || "Unable to sign in");
+    if (error) {
+      // Carry the code so the page can special-case e.g. EMAIL_NOT_VERIFIED.
+      throw Object.assign(new Error(error.message || "Unable to sign in"), {
+        code: error.code,
+      });
+    }
     setUser(await authApi.fetchMe());
   }, []);
 
@@ -53,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         timezone: authApi.browserTimezone(),
       });
       if (error) throw new Error(error.message || "Unable to create account");
-      setUser(await authApi.fetchMe());
+      // Email verification is required: signup does NOT create a session. The
+      // caller shows a "check your email" state instead of entering the app.
     },
     [],
   );
